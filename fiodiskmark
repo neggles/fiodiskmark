@@ -1,0 +1,102 @@
+#!/usr/bin/env bash
+# Script using Fio to roughly emulate CrystalDiskMark 8 on Windows
+# This is going to be a little dirty, and I apologize for my crimes.
+
+### BEGIN CONFIGURATION ###
+# Target path for test file
+export FDM_DIR=${FDM_DIR:-'/tank/temp'}
+
+# Size of test area in GB
+# CDM defaults this to 1, which is fine for HDDs, but too small to provide meaningful results with SSDs.
+# Recommend 4-8GB for SATA SSDs and 8-16GB for NVMe SSDs, but YMMV.
+export FDM_SIZE=${FDM_SIZE:-'8'}
+
+# Number of times to loop the test for consistency. 5 is plenty, but I'm not your supervisor.
+export FDM_LOOPS=${FDM_LOOPS:-'5'}
+
+# Use all-zero test data rather than random.
+# this lowers CPU usage, but provides invalid results on SSDs
+export FDM_ZERO=${FDM_ZERO:-'0'}
+
+# IO engine to use - if `io_uring` doesn't work on your system try `libaio`
+export FDM_ENGINE=${FDM_ENGINE:-'io_uring'}
+
+# Maximum time limit (Seconds) for individual test loops
+# total runtime will be FDM_DURATION * FDM_LOOPS
+export FDM_DURATION=${FDM_DURATION:-'30'}
+
+### END CONFIGURATION ###
+
+### BEGIN INTERNAL SETUP ###
+# get script rootdir
+SCRIPTPATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
+
+# Calculate individual slab sizes for Q8 sequential
+if [[ "$FDM_SIZE" -lt "$FDM_QDEPTH" ]]; then
+  export FDM_Q8SIZE='0.5'
+else
+    export FDM_Q8SIZE=$(($FDM_SIZE / 8))
+fi
+
+# Path to jobfile to use
+FIO_JOBFILE="${SCRIPTPATH}/fdm/cdm-default.fio"
+
+# Assemble today's output file names
+TIMESTAMP="$(date +%Y%m%d-%H%M%S)"
+FDM_OUTDIR="${SCRIPTPATH}/out"
+
+FIO_OUTPATH="${FDM_OUTDIR}/fdm-${TIMESTAMP}-full.json"
+FDM_RESFILE="${FDM_OUTDIR}/fdm-${TIMESTAMP}.json"
+
+### END INTERNAL SETUP ###
+
+### BEGIN EXECUTION ###
+# Echo our params
+echo "fiodiskmark v${FDM_VERSION}"
+echo "using ${FDM_ENGINE} with ${FDM_SIZE}GB file in ${FDM_DIR}, ${FDM_LOOPS} loops"
+echo "estimated runtime $((FDM_DURATION * FDM_LOOPS)) seconds"
+echo "Invoking fio, please wait for completion..."
+
+# actual execution
+fio --output-format=json --output=${FIO_OUTPATH} ${FIO_JOBFILE}
+
+# clean up temp file
+rm -f "${FDM_DIR}/fiomark.tmp"
+
+# ok now we have our data so lets make jq monch it
+# make summary
+jq -f ${FDM_JQFILE} ${FIO_OUTPATH} > ${FDM_RESFILE}
+
+# get results for individual jobs
+QUERY='.[] | select(.job=="SEQ1M-Q8T1") | .read.bw, .read.iops, .write.bw, .write.iops, .mix.bw, .mix.iops'
+read -d '\n' -ra SEQ1M_Q8T1 <<< "$(jq "$QUERY" "$FDM_RESFILE")"
+QUERY='.[] | select(.job=="SEQ1M-Q1T1") | .read.bw, .read.iops, .write.bw, .write.iops, .mix.bw, .mix.iops'
+read -d '\n' -ra SEQ1M_Q1T1 <<< "$(jq "$QUERY" "$FDM_RESFILE")"
+QUERY='.[] | select(.job=="RND4K-Q32T16") | .read.bw, .read.iops, .write.bw, .write.iops, .mix.bw, .mix.iops'
+read -d '\n' -ra RND4K_Q32T16 <<< "$(jq "$QUERY" "$FDM_RESFILE")"
+QUERY='.[] | select(.job=="RND4K-Q1T1") | .read.bw, .read.iops, .write.bw, .write.iops, .mix.bw, .mix.iops'
+read -d '\n' -ra RND4K_Q1T1 <<< "$(jq "$QUERY" "$FDM_RESFILE")"
+
+# print nice colorful summmary
+echo -e "
+Results:
+\033[1;33m
+SEQ1M-Q8T1 Read:    ${SEQ1M_Q8T1[0]}MB/s\t${SEQ1M_Q8T1[1]} IOPS
+SEQ1M-Q8T1 Write:   ${SEQ1M_Q8T1[2]}MB/s\t${SEQ1M_Q8T1[3]} IOPS
+SEQ1M-Q8T1 Mix:     ${SEQ1M_Q8T1[4]}MB/s\t${SEQ1M_Q8T1[5]} IOPS
+\033[1;32m
+SEQ1M-Q1T1 Read:    ${SEQ1M_Q1T1[0]}MB/s\t${SEQ1M_Q1T1[1]} IOPS
+SEQ1M-Q1T1 Write:   ${SEQ1M_Q1T1[2]}MB/s\t${SEQ1M_Q1T1[3]} IOPS
+SEQ1M-Q1T1 Mix:     ${SEQ1M_Q1T1[4]}MB/s\t${SEQ1M_Q1T1[5]} IOPS
+\033[1;36m
+RND4K-Q32T16 Read:  ${RND4K_Q32T16[0]}MB/s\t${RND4K_Q32T16[1]} IOPS
+RND4K-Q32T16 Write: ${RND4K_Q32T16[2]}MB/s\t${RND4K_Q32T16[3]} IOPS
+RND4K-Q32T16 Mix:   ${RND4K_Q32T16[4]}MB/s\t${RND4K_Q32T16[5]} IOPS
+\033[1;35m
+RND4K-Q1T1 Read:    ${RND4K_Q1T1[0]}MB/s\t${RND4K_Q1T1[1]} IOPS
+RND4K-Q1T1 Write:   ${RND4K_Q1T1[2]}MB/s\t${RND4K_Q1T1[3]} IOPS
+RND4K-Q1T1 Mix:     ${RND4K_Q1T1[4]}MB/s\t${RND4K_Q1T1[5]} IOPS
+\033[0m]
+"
+
+exit 0

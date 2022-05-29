@@ -1,0 +1,107 @@
+; -- fio jobfile to emulate CrystalDiskMark --
+; runs all four tests from Default profile
+[global]
+ioengine=${FDM_ENGINE}
+directory=${FDM_DIR}
+direct=1
+size=${FDM_SIZE}g
+group_reporting=1
+zero_buffers=${FDM_ZERO}
+loops=${FDM_LOOPS}
+runtime=${FDM_DURATION}
+filename=fiomark.tmp
+
+; -- begin SEQ1M-Q8T1 --
+[SEQ1M-Q8T1-RD]
+stonewall=1
+bs=1m
+size=${FDM_Q8SIZE}g
+iodepth=8
+numjobs=1
+rw=read
+
+[SEQ1M-Q8T1-WR]
+wait_for_previous=1
+bs=1m
+size=${FDM_Q8SIZE}g
+iodepth=8
+numjobs=1
+rw=write
+
+[SEQ1M-Q8T1-MIX]
+stonewall=1
+bs=1m
+size=${FDM_Q8SIZE}g
+iodepth=8
+numjobs=1
+rw=rw
+; -- end SEQ1M-Q8T1 --
+
+; -- begin SEQ1M-Q1T1 --
+[SEQ1M-Q1T1-RD]
+stonewall=1
+bs=1m
+iodepth=1
+numjobs=1
+rw=read
+
+[SEQ1M-Q1T1-WR]
+wait_for_previous=1
+bs=1m
+iodepth=1
+numjobs=1
+rw=write
+
+[SEQ1M-Q1T1-MIX]
+stonewall=1
+bs=1m
+iodepth=1
+numjobs=1
+rw=rw
+; -- end SEQ1M-Q1T1 --
+
+; -- begin RND4K-Q32T16 --
+[RND4K-Q32T16-RD]
+stonewall=1
+bs=4k
+iodepth=32
+numjobs=16
+rw=randread
+
+[RND4K-Q32T16-WR]
+wait_for_previous=1
+bs=4k
+iodepth=32
+numjobs=16
+rw=randwrite
+
+[RND4K-Q32T16-MIX]
+stonewall=1
+bs=4k
+iodepth=32
+numjobs=16
+rw=randrw
+; -- end RND4K-Q32T16 --
+
+; -- begin RND4K-Q1T1 --
+[RND4K-Q1T1-RD]
+stonewall=1
+bs=4k
+iodepth=1
+numjobs=1
+rw=randread
+
+[RND4K-Q1T1-WR]
+wait_for_previous=1
+bs=4k
+iodepth=1
+numjobs=1
+rw=randwrite
+
+[RND4K-Q1T1-MIX]
+stonewall=1
+bs=4k
+iodepth=1
+numjobs=1
+rw=randrw
+; -- end RND4K-Q1T1 --
