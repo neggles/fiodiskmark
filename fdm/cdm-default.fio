@@ -10,6 +10,10 @@ zero_buffers=${FDM_ZERO}
 loops=${FDM_LOOPS}
 runtime=${FDM_DURATION}
 filename=fiomark.tmp
+end_fsync=1
+refill_buffers=1
+randrepeat=0
+rwmixread=70
 
 ; -- begin SEQ1M-Q8T1 --
 [SEQ1M-Q8T1-RD]

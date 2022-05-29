@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Script using Fio to roughly emulate CrystalDiskMark 8 on Windows
 # This is going to be a little dirty, and I apologize for my crimes.
+set -e
 
 ### BEGIN CONFIGURATION ###
 # Target path for test file
@@ -58,7 +59,7 @@ echo "estimated runtime $((FDM_DURATION * FDM_LOOPS)) seconds"
 echo "Invoking fio, please wait for completion..."
 
 # actual execution
-fio --output-format=json --output=${FIO_OUTPATH} ${FIO_JOBFILE}
+sudo -E fio --output-format=json --output=${FIO_OUTPATH} ${FIO_JOBFILE}
 
 # clean up temp file
 rm -f "${FDM_DIR}/fiomark.tmp"
